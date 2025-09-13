@@ -1,0 +1,29 @@
+# Web app Dockerfile
+FROM node:18-alpine
+
+RUN apk add --no-cache curl git
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json ./
+COPY apps/web/package.json ./apps/web/
+COPY shared/types/package.json ./shared/types/
+COPY shared/utils/package.json ./shared/utils/
+
+# Install dependencies
+RUN npm install
+
+# Copy source code
+COPY apps/web/ ./apps/web/
+COPY shared/ ./shared/
+
+# Build shared libraries
+RUN cd shared/types && npm run build
+RUN cd shared/utils && npm run build
+
+# Expose port
+EXPOSE 3002
+
+# Start development server
+CMD ["npm", "run", "dev:web"]

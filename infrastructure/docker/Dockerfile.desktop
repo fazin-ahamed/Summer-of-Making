@@ -1,0 +1,48 @@
+# Desktop app Dockerfile
+FROM node:18-alpine
+
+# Install system dependencies for Electron
+RUN apk add --no-cache \
+    curl \
+    git \
+    python3 \
+    make \
+    g++ \
+    mesa-gl \
+    xvfb \
+    gtk+3.0-dev \
+    libnotify-dev \
+    libnss3-dev \
+    libxtst6 \
+    libxrandr2 \
+    libasound2-dev \
+    libpangocairo-1.0-0 \
+    libatk1.0-0 \
+    libcairo-gobject2 \
+    libgtk-3-0 \
+    libgdk-pixbuf2.0-0
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json ./
+COPY apps/desktop/package.json ./apps/desktop/
+COPY shared/types/package.json ./shared/types/
+COPY shared/utils/package.json ./shared/utils/
+
+# Install dependencies
+RUN npm install
+
+# Copy source code
+COPY apps/desktop/ ./apps/desktop/
+COPY shared/ ./shared/
+
+# Build shared libraries
+RUN cd shared/types && npm run build
+RUN cd shared/utils && npm run build
+
+# Expose port for development server
+EXPOSE 3000
+
+# Start development server
+CMD ["npm", "run", "dev:desktop"]

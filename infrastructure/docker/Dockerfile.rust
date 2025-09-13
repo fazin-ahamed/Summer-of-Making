@@ -1,0 +1,44 @@
+# Rust development environment
+FROM rust:1.72-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    libsqlite3-dev \
+    build-essential \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install cargo-watch for development
+RUN cargo install cargo-watch
+
+# Set working directory
+WORKDIR /workspace
+
+# Copy Cargo files for dependency caching
+COPY rust-core/Cargo.toml ./Cargo.toml
+COPY rust-core/autoorganize-core/Cargo.toml ./autoorganize-core/Cargo.toml
+COPY rust-core/file-watcher/Cargo.toml ./file-watcher/Cargo.toml
+COPY rust-core/encryption/Cargo.toml ./encryption/Cargo.toml
+COPY rust-core/ingestion/Cargo.toml ./ingestion/Cargo.toml
+COPY rust-core/search/Cargo.toml ./search/Cargo.toml
+
+# Create dummy source files to cache dependencies
+RUN mkdir -p autoorganize-core/src file-watcher/src encryption/src ingestion/src search/src && \
+    echo "fn main() {}" > autoorganize-core/src/main.rs && \
+    echo "fn main() {}" > file-watcher/src/main.rs && \
+    echo "fn main() {}" > encryption/src/main.rs && \
+    echo "fn main() {}" > ingestion/src/main.rs && \
+    echo "fn main() {}" > search/src/main.rs
+
+# Build dependencies
+RUN cargo build --release
+RUN rm -rf autoorganize-core/src file-watcher/src encryption/src ingestion/src search/src
+
+# Copy actual source code
+COPY rust-core/ ./
+
+# Default command for development
+CMD ["cargo", "watch", "-x", "build"]

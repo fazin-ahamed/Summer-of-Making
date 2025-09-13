@@ -1,0 +1,51 @@
+[package]
+name = "autoorganize-core"
+version = "0.1.0"
+edition = "2021"
+authors = ["AutoOrganize Team"]
+description = "Core library for AutoOrganize with FFI bindings"
+license = "MIT"
+
+[lib]
+name = "autoorganize_core"
+crate-type = ["cdylib", "staticlib", "lib"]
+
+[dependencies]
+# Workspace dependencies
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+log = { workspace = true }
+tracing = { workspace = true }
+
+# FFI
+uniffi = { workspace = true }
+uniffi_macros = { workspace = true }
+
+# Database
+rusqlite = { workspace = true }
+rocksdb = { workspace = true }
+
+# Async
+futures = { workspace = true }
+async-trait = { workspace = true }
+
+# Configuration
+dirs = { workspace = true }
+
+# Local workspace dependencies
+autoorganize-file-watcher = { path = "../file-watcher" }
+autoorganize-encryption = { path = "../encryption" }
+autoorganize-ingestion = { path = "../ingestion" }
+autoorganize-search = { path = "../search" }
+
+[build-dependencies]
+uniffi = { workspace = true, features = ["build"] }
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi_bindgen.rs"

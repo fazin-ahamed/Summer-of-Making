@@ -1,0 +1,133 @@
+namespace autoorganize {};
+
+// Core data structures
+dictionary DocumentInfo {
+    string id;
+    string source_type;
+    string file_path;
+    string content_hash;
+    i64 ingested_at;
+    i64 modified_at;
+    string metadata_json;
+    string title;
+    string? content;
+};
+
+dictionary Entity {
+    string id;
+    string entity_type;
+    string name;
+    string properties_json;
+    i64 created_at;
+    f64? confidence;
+};
+
+dictionary SearchResult {
+    string id;
+    string result_type;
+    string title;
+    string snippet;
+    f64 relevance_score;
+    string source_json;
+    string metadata_json;
+};
+
+dictionary FileEvent {
+    string event_type;
+    string file_path;
+    i64 timestamp;
+    string? metadata_json;
+};
+
+// Configuration structures
+dictionary IngestionConfig {
+    sequence<string> watch_paths;
+    sequence<string> file_patterns;
+    sequence<string> exclude_patterns;
+    boolean auto_extract_entities;
+    boolean auto_build_relationships;
+};
+
+dictionary EncryptionConfig {
+    boolean enabled;
+    string algorithm;
+    string key_derivation;
+};
+
+dictionary CoreConfig {
+    string db_path;
+    IngestionConfig ingestion_config;
+    EncryptionConfig? encryption_config;
+};
+
+// Error types
+[Error]
+enum AutoOrganizeError {
+    "InvalidConfig",
+    "DatabaseError",
+    "FileSystemError",
+    "EncryptionError",
+    "IngestionError",
+    "SearchError",
+};
+
+// Callback interfaces for async operations
+callback interface FileWatcherCallback {
+    void on_file_event(FileEvent event);
+};
+
+callback interface IngestionCallback {
+    void on_document_ingested(DocumentInfo document);
+    void on_ingestion_error(string error_message);
+};
+
+callback interface SearchCallback {
+    void on_search_results(sequence<SearchResult> results);
+    void on_search_error(string error_message);
+};
+
+// Main interface
+interface AutoOrganizeCore {
+    constructor(CoreConfig config);
+    
+    // Initialization and cleanup
+    [Throws=AutoOrganizeError]
+    void initialize();
+    void shutdown();
+    
+    // File watching
+    [Throws=AutoOrganizeError]
+    void start_file_watching(sequence<string> paths, FileWatcherCallback callback);
+    void stop_file_watching();
+    
+    // Document ingestion
+    [Throws=AutoOrganizeError]
+    void ingest_document(string file_path, IngestionCallback callback);
+    [Throws=AutoOrganizeError]
+    void ingest_directory(string dir_path, IngestionCallback callback);
+    
+    // Search operations
+    [Throws=AutoOrganizeError]
+    void search_documents(string query, SearchCallback callback);
+    [Throws=AutoOrganizeError]
+    void search_entities(string query, SearchCallback callback);
+    
+    // Entity operations
+    [Throws=AutoOrganizeError]
+    sequence<Entity> get_entities(string? entity_type, u32? limit);
+    [Throws=AutoOrganizeError]
+    Entity? get_entity_by_id(string entity_id);
+    
+    // Document operations
+    [Throws=AutoOrganizeError]
+    sequence<DocumentInfo> get_documents(u32? limit, u32? offset);
+    [Throws=AutoOrganizeError]
+    DocumentInfo? get_document_by_id(string document_id);
+    [Throws=AutoOrganizeError]
+    void delete_document(string document_id);
+    
+    // Statistics and health
+    u64 get_document_count();
+    u64 get_entity_count();
+    string get_health_status();
+};

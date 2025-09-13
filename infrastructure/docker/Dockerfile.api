@@ -1,0 +1,79 @@
+# Base Node.js image for API service
+FROM node:18-alpine as base
+
+# Install system dependencies
+RUN apk add --no-cache \
+    curl \
+    git \
+    python3 \
+    make \
+    g++ \
+    sqlite \
+    sqlite-dev
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package.json ./
+COPY backend/api/package.json ./backend/api/
+COPY shared/types/package.json ./shared/types/
+COPY shared/utils/package.json ./shared/utils/
+
+# Install dependencies
+RUN npm install
+
+# Development stage
+FROM base as development
+
+# Install Rust for building core libraries
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Copy source code
+COPY . .
+
+# Build shared libraries
+RUN cd shared/types && npm run build
+RUN cd shared/utils && npm run build
+
+# Build Rust core libraries
+RUN cd rust-core && cargo build --release
+
+# Build API
+RUN cd backend/api && npm run build
+
+# Expose port
+EXPOSE 3001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:3001/health || exit 1
+
+# Start the API server
+CMD ["npm", "run", "dev:api"]
+
+# Production stage
+FROM node:18-alpine as production
+
+RUN apk add --no-cache curl sqlite
+
+WORKDIR /app
+
+# Copy built application
+COPY --from=development /app/backend/api/dist ./dist
+COPY --from=development /app/shared/types/dist ./shared/types/dist
+COPY --from=development /app/shared/utils/dist ./shared/utils/dist
+COPY --from=development /app/rust-core/target/release ./rust-core/target/release
+COPY --from=development /app/package.json ./
+COPY --from=development /app/backend/api/package.json ./backend/api/
+
+# Install production dependencies only
+RUN npm ci --only=production
+
+EXPOSE 3001
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:3001/health || exit 1
+
+CMD ["node", "dist/index.js"]
