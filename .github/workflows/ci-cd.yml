@@ -1,0 +1,592 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  release:
+    types: [ published ]
+
+env:
+  NODE_VERSION: '18'
+  RUST_VERSION: 'stable'
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Static Analysis and Code Quality
+  lint-and-format:
+    name: Lint and Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: '**/package-lock.json'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run ESLint
+        run: npm run lint
+      
+      - name: Check TypeScript
+        run: npm run type-check
+      
+      - name: Check Prettier formatting
+        run: npm run format:check
+      
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: rustfmt, clippy
+          override: true
+      
+      - name: Check Rust formatting
+        run: cargo fmt --all -- --check
+        working-directory: ./rust-core
+      
+      - name: Run Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+        working-directory: ./rust-core
+
+  # Security Scanning
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+      
+      - name: Setup Node.js for audit
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Run npm audit
+        run: |
+          npm audit --audit-level=high
+          if [ $? -ne 0 ]; then
+            echo "High or critical vulnerabilities found"
+            exit 1
+          fi
+      
+      - name: Rust security audit
+        uses: actions-rs/audit-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Unit Tests
+  test-rust:
+    name: Test Rust Libraries
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          override: true
+      
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust-core/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Install system dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsodium-dev
+      
+      - name: Install system dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install libsodium
+      
+      - name: Install system dependencies (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          # Windows setup for libsodium
+          echo "Setting up Windows dependencies"
+      
+      - name: Run tests
+        run: cargo test --all-features --workspace
+        working-directory: ./rust-core
+      
+      - name: Run benchmarks
+        run: cargo bench --workspace
+        working-directory: ./rust-core
+
+  test-node:
+    name: Test Node.js API
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      neo4j:
+        image: neo4j:5-community
+        ports:
+          - 7687:7687
+          - 7474:7474
+        env:
+          NEO4J_AUTH: neo4j/password
+          NEO4J_PLUGINS: '["apoc"]'
+        options: >-
+          --health-cmd "cypher-shell -u neo4j -p password 'RETURN 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: '**/package-lock.json'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Wait for Neo4j
+        run: |
+          timeout 300 bash -c 'until nc -z localhost 7687; do sleep 1; done'
+      
+      - name: Run API tests
+        run: npm test
+        working-directory: ./backend/api
+        env:
+          NODE_ENV: test
+          DATABASE_URL: ':memory:'
+          REDIS_URL: redis://localhost:6379
+          NEO4J_URI: bolt://localhost:7687
+          NEO4J_USER: neo4j
+          NEO4J_PASSWORD: password
+      
+      - name: Upload API test coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./backend/api/coverage/lcov.info
+          flags: api
+          name: api-coverage
+
+  test-desktop:
+    name: Test Desktop App
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: '**/package-lock.json'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run desktop tests
+        run: npm test
+        working-directory: ./apps/desktop
+        env:
+          CI: true
+      
+      - name: Upload desktop test coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./apps/desktop/coverage/lcov.info
+          flags: desktop
+          name: desktop-coverage
+
+  test-mobile:
+    name: Test Mobile App
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: '**/package-lock.json'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run mobile tests
+        run: npm test
+        working-directory: ./apps/mobile
+        env:
+          CI: true
+      
+      - name: Upload mobile test coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./apps/mobile/coverage/lcov.info
+          flags: mobile
+          name: mobile-coverage
+
+  # Integration Tests
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [test-rust, test-node]
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+      neo4j:
+        image: neo4j:5-community
+        ports:
+          - 7687:7687
+        env:
+          NEO4J_AUTH: neo4j/password
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          override: true
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsodium-dev
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build Rust libraries
+        run: cargo build --release
+        working-directory: ./rust-core
+      
+      - name: Build API
+        run: npm run build
+        working-directory: ./backend/api
+      
+      - name: Run integration tests
+        run: npm test
+        working-directory: ./tests
+        env:
+          NODE_ENV: test
+          API_URL: http://localhost:3001
+          REDIS_URL: redis://localhost:6379
+          NEO4J_URI: bolt://localhost:7687
+
+  # Build Applications
+  build-desktop:
+    name: Build Desktop App
+    runs-on: ${{ matrix.os }}
+    needs: [lint-and-format, test-desktop]
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          override: true
+      
+      - name: Install system dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsodium-dev
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build Rust libraries
+        run: cargo build --release
+        working-directory: ./rust-core
+      
+      - name: Build desktop app
+        run: npm run build
+        working-directory: ./apps/desktop
+      
+      - name: Package desktop app
+        run: npm run package
+        working-directory: ./apps/desktop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: desktop-${{ matrix.os }}
+          path: |
+            apps/desktop/dist/**/*
+            apps/desktop/build/**/*
+
+  build-mobile:
+    name: Build Mobile App
+    runs-on: ubuntu-latest
+    needs: [lint-and-format, test-mobile]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Setup Expo CLI
+        run: npm install -g @expo/cli
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build mobile app
+        run: npm run build
+        working-directory: ./apps/mobile
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: mobile-build
+          path: apps/mobile/dist/**/*
+
+  # Performance Tests
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: [integration-tests]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run performance tests
+        run: npm run test:performance
+        working-directory: ./tests
+      
+      - name: Upload performance results
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-results
+          path: tests/performance-results.json
+
+  # Deployment
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [integration-tests, build-desktop, build-mobile]
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+      
+      - name: Deploy API to staging
+        run: |
+          echo "Deploying API to staging environment"
+          # Add actual deployment commands here
+        env:
+          STAGING_API_KEY: ${{ secrets.STAGING_API_KEY }}
+          STAGING_DB_URL: ${{ secrets.STAGING_DB_URL }}
+      
+      - name: Run smoke tests
+        run: |
+          echo "Running smoke tests against staging"
+          # Add smoke test commands here
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [integration-tests, build-desktop, build-mobile, performance-tests]
+    if: github.event_name == 'release'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+      
+      - name: Deploy API to production
+        run: |
+          echo "Deploying API to production environment"
+          # Add actual deployment commands here
+        env:
+          PROD_API_KEY: ${{ secrets.PROD_API_KEY }}
+          PROD_DB_URL: ${{ secrets.PROD_DB_URL }}
+      
+      - name: Update GitHub release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            desktop-ubuntu-latest/**/*
+            desktop-windows-latest/**/*
+            desktop-macos-latest/**/*
+            mobile-build/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Notify deployment
+        run: |
+          echo "Production deployment completed successfully"
+          # Add notification logic (Slack, email, etc.)
+
+  # Docker Images
+  build-docker:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [test-node]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/api
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+      
+      - name: Build and push API image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend/api
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Documentation
+  build-docs:
+    name: Build Documentation
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build documentation
+        run: |
+          npm run docs:build
+          # Generate API docs from OpenAPI spec
+          # Build user guides and tutorials
+      
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs/dist
+
+  # Notification
+  notify-completion:
+    name: Notify Completion
+    runs-on: ubuntu-latest
+    needs: [deploy-production, build-docker, build-docs]
+    if: always()
+    steps:
+      - name: Notify on success
+        if: contains(needs.*.result, 'success')
+        run: |
+          echo "✅ CI/CD Pipeline completed successfully!"
+          # Add success notifications here
+      
+      - name: Notify on failure
+        if: contains(needs.*.result, 'failure')
+        run: |
+          echo "❌ CI/CD Pipeline failed!"
+          # Add failure notifications here

@@ -1,0 +1,48 @@
+[package]
+name = "autoorganize-ingestion"
+version = "0.1.0"
+edition = "2021"
+authors = ["AutoOrganize Team"]
+description = "Document ingestion engine for AutoOrganize"
+license = "MIT"
+
+[dependencies]
+# Workspace dependencies
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+log = { workspace = true }
+tracing = { workspace = true }
+
+# File system
+walkdir = { workspace = true }
+
+# Text processing
+regex = { workspace = true }
+unicode-segmentation = { workspace = true }
+
+# Async
+futures = { workspace = true }
+async-trait = { workspace = true }
+
+# PDF processing
+pdf-extract = "0.6"
+
+# Office documents
+docx-rs = "0.4"
+
+# Image OCR (optional)
+# tesseract = { version = "0.14", optional = true }
+
+# HTML/XML parsing
+scraper = "0.17"
+
+# CSV processing
+csv = "1.2"
+
+# Local dependencies
+autoorganize-encryption = { path = "../encryption" }

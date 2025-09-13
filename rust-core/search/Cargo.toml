@@ -1,0 +1,37 @@
+[package]
+name = "autoorganize-search"
+version = "0.1.0"
+edition = "2021"
+authors = ["AutoOrganize Team"]
+description = "Search and indexing engine for AutoOrganize"
+license = "MIT"
+
+[dependencies]
+# Workspace dependencies
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+log = { workspace = true }
+tracing = { workspace = true }
+
+# Database
+rusqlite = { workspace = true }
+
+# Text processing
+regex = { workspace = true }
+unicode-segmentation = { workspace = true }
+stemmer = { workspace = true }
+
+# Async
+futures = { workspace = true }
+async-trait = { workspace = true }
+
+# Vector similarity (using simple cosine similarity for now)
+ndarray = "0.15"
+
+# Text similarity
+strsim = "0.10"

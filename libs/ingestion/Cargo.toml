@@ -1,0 +1,57 @@
+[package]
+name = "ingestion"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "ingestion"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Core dependencies
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+log = { workspace = true }
+tokio = { workspace = true }
+
+# Document processing
+pdf-extract = "0.7"
+docx-rs = "0.4"
+scraper = "0.17"
+csv = "1.2"
+regex = { workspace = true }
+sha2 = "0.10"
+
+# Text processing and NLP
+unicode-segmentation = { workspace = true }
+stemmer = { workspace = true }
+
+# FFI bindings
+uniffi = { workspace = true }
+uniffi_macros = { workspace = true }
+
+# File system
+walkdir = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio-test = { workspace = true }
+serial_test = { workspace = true }
+test-case = { workspace = true }
+pretty_assertions = { workspace = true }
+criterion = { workspace = true }
+
+[build-dependencies]
+uniffi = { workspace = true }
+
+[[bench]]
+name = "ingestion_bench"
+harness = false
+
+[features]
+default = []
+ffi = ["uniffi"]
+ocr = []

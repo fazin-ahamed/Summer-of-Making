@@ -1,0 +1,27 @@
+[package]
+name = "autoorganize-encryption"
+version = "0.1.0"
+edition = "2021"
+authors = ["AutoOrganize Team"]
+description = "Encryption engine for AutoOrganize"
+license = "MIT"
+
+[dependencies]
+# Workspace dependencies
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
+
+# Encryption
+sodiumoxide = { workspace = true }
+
+# Random number generation
+rand = "0.8"
+
+# Base64 encoding
+base64 = "0.21"
+
+# Key derivation
+argon2 = "0.5"

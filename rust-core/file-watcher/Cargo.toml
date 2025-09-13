@@ -1,0 +1,27 @@
+[package]
+name = "autoorganize-file-watcher"
+version = "0.1.0"
+edition = "2021"
+authors = ["AutoOrganize Team"]
+description = "File system watcher for AutoOrganize"
+license = "MIT"
+
+[dependencies]
+# Workspace dependencies
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+log = { workspace = true }
+tracing = { workspace = true }
+
+# File watching
+notify = { workspace = true }
+walkdir = { workspace = true }
+
+# Async
+futures = { workspace = true }
+async-trait = { workspace = true }

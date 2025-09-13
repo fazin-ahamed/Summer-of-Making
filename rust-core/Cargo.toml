@@ -54,6 +54,14 @@ async-trait = "0.1"
 config = "0.13"
 dirs = "5.0"
 
+# Testing dependencies
+tempfile = "3.8"
+serial_test = "3.0"
+test-case = "3.3"
+criterion = { version = "0.5", features = ["html_reports"] }
+tokio-test = "0.4"
+pretty_assertions = "1.4"
+
 [profile.release]
 lto = true
 codegen-units = 1

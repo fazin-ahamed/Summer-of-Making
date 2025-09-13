@@ -1,0 +1,53 @@
+[package]
+name = "search"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "search"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Core dependencies
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
+tokio = { workspace = true }
+
+# Search and indexing
+regex = { workspace = true }
+unicode-segmentation = { workspace = true }
+stemmer = { workspace = true }
+
+# Mathematical operations
+nalgebra = "0.32"
+ordered-float = "4.1"
+
+# FFI bindings
+uniffi = { workspace = true }
+uniffi_macros = { workspace = true }
+
+# Database
+rusqlite = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio-test = { workspace = true }
+serial_test = { workspace = true }
+test-case = { workspace = true }
+pretty_assertions = { workspace = true }
+criterion = { workspace = true }
+
+[build-dependencies]
+uniffi = { workspace = true }
+
+[[bench]]
+name = "search_bench"
+harness = false
+
+[features]
+default = []
+ffi = ["uniffi"]
+semantic = ["nalgebra"]
