@@ -1,0 +1,99 @@
+{
+  "name": "autoorganize",
+  "version": "0.1.0",
+  "description": "Personal Knowledge Management System with universal data ingestion and semantic understanding",
+  "author": "AutoOrganize Team",
+  "license": "MIT",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "backend/*",
+    "shared/*"
+  ],
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev": "concurrently \"npm run dev:rust\" \"npm run dev:api\" \"npm run dev:desktop\"",
+    "dev:rust": "cd rust-core && cargo build",
+    "dev:api": "cd backend/api && npm run dev",
+    "dev:desktop": "cd apps/desktop && npm run dev",
+    "dev:mobile": "cd apps/mobile && npm run dev",
+    "dev:web": "cd apps/web && npm run dev",
+    "build": "npm run build:rust && npm run build:shared && npm run build:api && npm run build:desktop && npm run build:mobile && npm run build:web",
+    "build:rust": "cd rust-core && cargo build --release",
+    "build:shared": "cd shared/types && npm run build && cd ../utils && npm run build",
+    "build:api": "cd backend/api && npm run build",
+    "build:desktop": "cd apps/desktop && npm run build",
+    "build:mobile": "cd apps/mobile && npm run build",
+    "build:web": "cd apps/web && npm run build",
+    "test": "npm run test:rust && npm run test:api && npm run test:desktop && npm run test:mobile && npm run test:web",
+    "test:rust": "cd rust-core && cargo test",
+    "test:api": "cd backend/api && npm test",
+    "test:desktop": "cd apps/desktop && npm test",
+    "test:mobile": "cd apps/mobile && npm test",
+    "test:web": "cd apps/web && npm test",
+    "lint": "npm run lint:api && npm run lint:desktop && npm run lint:mobile && npm run lint:web",
+    "lint:api": "cd backend/api && npm run lint",
+    "lint:desktop": "cd apps/desktop && npm run lint",
+    "lint:mobile": "cd apps/mobile && npm run lint",
+    "lint:web": "cd apps/web && npm run lint",
+    "clean": "npm run clean:rust && npm run clean:node",
+    "clean:rust": "cd rust-core && cargo clean",
+    "clean:node": "rm -rf node_modules apps/*/node_modules backend/*/node_modules shared/*/node_modules",
+    "setup": "npm install && npm run build:rust && npm run build:shared",
+    "docker:build": "docker-compose -f infrastructure/docker/docker-compose.yml build",
+    "docker:up": "docker-compose -f infrastructure/docker/docker-compose.yml up -d",
+    "docker:down": "docker-compose -f infrastructure/docker/docker-compose.yml down",
+    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md}\" && cd rust-core && cargo fmt"
+  },
+  "devDependencies": {
+    "@types/node": "^20.5.0",
+    "@typescript-eslint/eslint-plugin": "^6.4.0",
+    "@typescript-eslint/parser": "^6.4.0",
+    "concurrently": "^8.2.0",
+    "eslint": "^8.47.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.1.6",
+    "husky": "^8.0.3",
+    "lint-staged": "^13.2.3"
+  },
+  "dependencies": {
+    "dotenv": "^16.3.1"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  },
+  "lint-staged": {
+    "**/*.{js,jsx,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "**/*.{json,md}": [
+      "prettier --write"
+    ]
+  },
+  "keywords": [
+    "knowledge-management",
+    "personal-organizer",
+    "semantic-search",
+    "document-ingestion",
+    "electron",
+    "react-native",
+    "rust",
+    "typescript"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/autoorganize.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-org/autoorganize/issues"
+  },
+  "homepage": "https://github.com/your-org/autoorganize#readme"
+}
